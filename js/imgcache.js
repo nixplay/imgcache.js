@@ -99,7 +99,7 @@ var ImgCache = {
         if (!idx) {
             return;
         }
-        return fullpath.substr(idx + 1).toLowerCase();
+        return fullpath.substr(idx + 1).toLowerCase().split('?')[0];
     };
 
     // returns lower cased path from full URI
@@ -332,7 +332,7 @@ var ImgCache = {
             ImgCache.overridables.log('No source given to getCachedFileName', LOG_LEVEL_WARNING);
             return;
         }
-        var hash = ImgCache.overridables.hash(img_src);
+        var hash = ImgCache.overridables.hash(img_src.split('?')[0]);
         var ext = Helpers.FileGetExtension(Helpers.URIGetFileName(img_src));
         return hash + (ext ? ('.' + ext) : '');
     };
