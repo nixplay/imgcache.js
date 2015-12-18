@@ -126,7 +126,7 @@ var ImgCache = {
     };
 
     Helpers.hasJqueryOrJqueryLite = function () {
-        return (ImgCache.jQuery || ImgCache.jQueryLite); 
+        return (ImgCache.jQuery || ImgCache.jQueryLite);
     };
 
     Helpers.isCordova = function () {
@@ -435,10 +435,12 @@ var ImgCache = {
         }
         xhr.onload = function () {
             if (xhr.response && (xhr.status === 200 || xhr.status === 0)) {
+                var orientation = xhr.getResponseHeader('x-amz-meta-orientation');
+                var imgName = localPath.replace('/imgcache/', '');
                 filesystem.root.getFile(localPath, { create:true }, function (fileEntry) {
                     fileEntry.createWriter(function (writer) {
                         writer.onerror = error_callback;
-                        writer.onwriteend = function () { success_callback(fileEntry);  };
+                        writer.onwriteend = function () { success_callback(fileEntry, orientation);  };
                         writer.write(xhr.response, error_callback);
                     }, error_callback);
                 }, error_callback);
@@ -642,7 +644,8 @@ var ImgCache = {
         fileTransfer.download(
             img_src,
             filePath,
-            function (entry) {
+            function (entry, orientation) {
+                localStorage.setItem('orientation:' + entry.name, orientation);
                 entry.getMetadata(function (metadata) {
                     if (metadata && metadata.hasOwnProperty('size')) {
                         ImgCache.overridables.log('Cached file size: ' + metadata.size, LOG_LEVEL_INFO);
@@ -717,7 +720,8 @@ var ImgCache = {
             if (!entry) {
                 if (error_callback) { error_callback(img_src); }
             } else {
-                success_callback(img_src, Helpers.EntryGetURL(entry));
+                var orientation = localStorage.getItem('orientation:' + entry.name) || "1";
+                success_callback(img_src, orientation, Helpers.EntryGetURL(entry));
             }
         };
 
