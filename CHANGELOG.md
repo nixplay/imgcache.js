@@ -2,15 +2,56 @@
 
 ## master ##
 
+## 1.2.0 ##
+
+### NEW ###
+
+* Added `useCachedBackgroundWithSource` API method (#195)
+
+### FIXED ###
+
+* Fix for usePersistentCache flag not working (#197)
+
+## 1.1.0 ##
+
+### NEW ###
+
+* Add `withCredentials` option (#179 thanks oliver-schoendorn)
+* Add `cordovaFilesystemRoot` option (#111 thanks tjwoon)
+* Add `timeout` option (#190 thanks gabrielstuff)
+
+### FIXED ###
+
+* Fix for background image url parser (#181 thanks vitaliy-bobrov)
+* Prevent url from being sanitized twice (#176 thanks jlopezinc)
+
+## 1.0.0 ##
+
+### FIXED ###
+* Fixed issue with _chrisben:imgcache_ folder name (Meteor package) (thanks filozoom)
+
+### IMPROVED ###
+* Improved documentation regarding Android and iOS (#148 thanks eekilli)
+* Some code improvements (thanks Lanayx)
+
+## 1.0rc2 ##
+
+### FIXED ###
+* Fix for Windows Phone 8.1 (#132 thanks badpenguin and Sturgelose)
+* Fix for empty cache size on Chrome
+* Fix for 'Not allowed to load local resource' error (#97, #115 thanks Maistho)
+
 ### IMPROVED ###
 * Don't set iCloud-related metadata outside iOS (#112)
 * Added note about bower & npm in the README (#104)
+* Avoid double forward slashes in cached files paths (#108)
+* Added Meteor integration (#125 thanks caio-ribeiro-pereira)
 
-## 1.0rc1 ##
+## 1.0rc1 ##
 
 ### NEW ###
 * Added a wrapper for imgcache that supports Promises (qimgcache.js)
-* Helpers, DomHelpers and Private classes are now available publicly via ImgCache.helpers, ImgCache.domHelpers and ImgCache.private respectively. Those are not just plain public because you generally shouldn't need them, though they're now accessible.
+* Helpers, DomHelpers and Private classes are now available publicly via ImgCache.helpers, ImgCache.domHelpers and ImgCache.private respectively. Those are not just plain public because you generally shouldn't need them, though they're now accessible
 
 ### FIXED ###
 * Fixed issue on iOS devices (#93)

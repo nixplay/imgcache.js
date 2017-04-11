@@ -1,5 +1,5 @@
 /*! imgcache.js
-   Copyright 2012-2015 Christophe BENOIT
+   Copyright 2012-2017 Christophe BENOIT
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 /*global console,LocalFileSystem,device,FileTransfer,define,module*/
 
 var ImgCache = {
-        version: '1.0rc1',
+        version: '1.2.0',
         // options to override before using the library (but after loading this script!)
         options: {
             debug: false,                           /* call the log method ? */
@@ -28,7 +28,10 @@ var ImgCache = {
             usePersistentCache: true,               /* false = use temporary cache storage */
             cacheClearSize: 0,                      /* size in MB that triggers cache clear on init, 0 to disable */
             headers: {},                            /* HTTP headers for the download requests -- e.g: headers: { 'Accept': 'application/jpg' } */
-            skipURIencoding: false                  /* enable if URIs are already encoded (skips call to sanitizeURI) */
+            withCredentials: false,                 /* indicates whether or not cross-site Access-Control requests should be made using credentials */
+            skipURIencoding: false,                 /* enable if URIs are already encoded (skips call to sanitizeURI) */
+            cordovaFilesystemRoot: null,            /* if specified, use one of the Cordova File plugin's app directories for storage */
+            timeout: 0                              /* timeout delay in ms for xhr request */
         },
         overridables: {
             hash: function (s) {
@@ -66,6 +69,9 @@ var ImgCache = {
         if (ImgCache.options.skipURIencoding) {
             return uri;
         } else {
+            if (uri.length >= 2 && uri[0] === '"' && uri[uri.length - 1] === '"') {
+              uri = uri.substr(1, uri.length - 2);
+            }
             var encodedURI = encodeURI(uri);
             /*
             TODO: The following bit of code will have to be checked first (#30)
@@ -112,7 +118,7 @@ var ImgCache = {
     };
 
     // returns extension from filename (without leading '.')
-    Helpers.FileGetExtension = function (filename) {
+    Helpers.fileGetExtension = function (filename) {
         if (!filename) {
             return '';
         }
@@ -125,12 +131,22 @@ var ImgCache = {
         return ext;
     };
 
+    Helpers.appendPaths = function (path1, path2) {
+        if (!path2) {
+            path2 = '';
+        }
+        if (!path1 || path1 === '') {
+            return (path2.length > 0 && path2[0] == '/' ? '' : '/') + path2;
+        }
+        return path1 + ( ((path1[path1.length - 1] == '/') || (path2.length > 0 && path2[0] == '/')) ? '' : '/' ) + path2;
+    };
+
     Helpers.hasJqueryOrJqueryLite = function () {
         return (ImgCache.jQuery || ImgCache.jQueryLite);
     };
 
     Helpers.isCordova = function () {
-        return (typeof cordova !== 'undefined' || typeof phonegap !== 'undefined');
+        return (typeof cordova !== 'undefined' || typeof phonegap !== 'undefined') && (cordova||phonegap).platformId !== 'browser';
     };
 
     Helpers.isCordovaAndroid = function () {
@@ -138,7 +154,7 @@ var ImgCache = {
     };
 
     Helpers.isCordovaWindowsPhone = function () {
-        return (Helpers.isCordova() && device && device.platform && device.platform.toLowerCase().indexOf('win32nt') >= 0);
+        return (Helpers.isCordova() && device && device.platform && ((device.platform.toLowerCase().indexOf('win32nt') >= 0) || (device.platform.toLowerCase().indexOf('windows') >= 0)));
     };
 
     Helpers.isCordovaIOS = function () {
@@ -164,6 +180,9 @@ var ImgCache = {
     Helpers.EntryToURL = function (entry) {
         if (Helpers.isCordovaAndroidOlderThan4() && typeof entry.toNativeURL === 'function') {
             return entry.toNativeURL();
+        } else if (typeof entry.toInternalURL === 'function') {
+            // Fix for #97
+            return entry.toInternalURL();
         } else {
             return entry.toURL();
         }
@@ -312,19 +331,19 @@ var ImgCache = {
 
     Private.setCurrentSize = function (curSize) {
         ImgCache.overridables.log('current size: ' + curSize, LOG_LEVEL_INFO);
-        if (Private.hasLocalStorage()){
+        if (Private.hasLocalStorage()) {
             localStorage.setItem('imgcache:' + ImgCache.options.localCacheFolder, curSize);
         }
     };
 
     Private.getCachedFilePath = function (img_src) {
-        return ImgCache.options.localCacheFolder + '/' + Private.getCachedFileName(img_src);
+        return Helpers.appendPaths(ImgCache.options.localCacheFolder, Private.getCachedFileName(img_src));
     };
 
     // used for FileTransfer.download only
     Private.getCachedFileFullPath = function (img_src) {
         var local_root = Helpers.EntryGetPath(ImgCache.attributes.dirEntry);
-        return (local_root ? local_root + '/' : '/') + Private.getCachedFileName(img_src);
+        return Helpers.appendPaths(local_root, Private.getCachedFileName(img_src));
     };
 
     Private.getCachedFileName = function (img_src) {
@@ -332,8 +351,8 @@ var ImgCache = {
             ImgCache.overridables.log('No source given to getCachedFileName', LOG_LEVEL_WARNING);
             return;
         }
-        var hash = ImgCache.overridables.hash(img_src.split('?')[0]);
-        var ext = Helpers.FileGetExtension(Helpers.URIGetFileName(img_src));
+        var hash = ImgCache.overridables.hash(img_src);
+        var ext = Helpers.fileGetExtension(Helpers.URIGetFileName(img_src));
         return hash + (ext ? ('.' + ext) : '');
     };
 
@@ -429,6 +448,12 @@ var ImgCache = {
         if (isOnProgressAvailable) {
             xhr.onprogress = on_progress;
         }
+
+        if (ImgCache.options.withCredentials) {
+            xhr.withCredentials = true;
+        }
+
+        xhr.timeout = ImgCache.options.timeout
         xhr.responseType = 'blob';
         for (var key in headers) {
             xhr.setRequestHeader(key, headers[key]);
@@ -459,10 +484,9 @@ var ImgCache = {
         if (!backgroundImageProperty) {
             return;
         }
-        var regexp = /\((.+)\)/;
+        var regexp = /url\s?\((.+)\)/;
         var img_src = regexp.exec(backgroundImageProperty)[1];
-
-        return img_src.replace(/(['"])/g, "");
+        return img_src.replace(/(['"])/g, '');
     };
 
     Private.loadCachedFile = function ($element, img_src, set_path_callback, success_callback, error_callback) {
@@ -528,6 +552,12 @@ var ImgCache = {
         ImgCache.attributes.filesystem.root.getFile(Private.getCachedFilePath(img_src), {create: false}, _gotFileEntry, _fail);
     };
 
+    Private.setBackgroundImagePath = function ($element, new_src, old_src) {
+        DomHelpers.setBackgroundImage($element, 'url("' + new_src + '")');
+        // store previous url in case we need to reload it
+        DomHelpers.setAttribute($element, OLD_BACKGROUND_ATTR, old_src);
+    };
+
     /****************************************************************************/
 
 
@@ -569,19 +599,16 @@ var ImgCache = {
             ImgCache.overridables.log('Failed to initialise LocalFileSystem ' + error.code, LOG_LEVEL_ERROR);
             if (error_callback) { error_callback(); }
         };
-        if (Helpers.isCordova()) {
+        if (Helpers.isCordova() && window.requestFileSystem) {
             // PHONEGAP
-            if(ImgCache.options.cordovaFilesystemRoot) {
+            if (ImgCache.options.cordovaFilesystemRoot) {
                 try {
                     window.resolveLocalFileSystemURL(
                         ImgCache.options.cordovaFilesystemRoot,
                         function (dirEntry) {
                             _gotFS({ root: dirEntry });
                         },
-                        function (e) {
-                            if(typeof e == "object") _fail(e);
-                            else _fail({}); // no idea whether the error callback is guaranteed to be called with an object argument
-                        }
+                        _fail
                     );
                 } catch (e) {
                     _fail({ code: e.message })
@@ -591,7 +618,7 @@ var ImgCache = {
             }
         } else {
             //CHROME
-            window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
+            var savedFS = window.requestFileSystem || window.webkitRequestFileSystem;
             window.storageInfo = window.storageInfo || (ImgCache.options.usePersistentCache ? navigator.webkitPersistentStorage : navigator.webkitTemporaryStorage);
             if (!window.storageInfo) {
                 ImgCache.overridables.log('Your browser does not support the html5 File API', LOG_LEVEL_WARNING);
@@ -604,8 +631,8 @@ var ImgCache = {
                 quota_size,
                 function () {
                     /* success*/
-                    var persistence = (ImgCache.options.usePersistentCache ? window.storageInfo.PERSISTENT : window.storageInfo.TEMPORARY);
-                    window.requestFileSystem(persistence, quota_size, _gotFS, _fail);
+                    var persistence = (ImgCache.options.usePersistentCache ? window.PERSISTENT : window.TEMPORARY);
+                    savedFS(persistence, quota_size, _gotFS, _fail);
                 },
                 function (error) {
                     /* error*/
@@ -647,7 +674,7 @@ var ImgCache = {
             function (entry, orientation) {
                 localStorage.setItem('orientation:' + entry.name, orientation);
                 entry.getMetadata(function (metadata) {
-                    if (metadata && metadata.hasOwnProperty('size')) {
+                    if (metadata && ('size' in metadata)) {
                         ImgCache.overridables.log('Cached file size: ' + metadata.size, LOG_LEVEL_INFO);
                         Private.setCurrentSize(ImgCache.getCurrentSize() + parseInt(metadata.size, 10));
                     } else {
@@ -673,7 +700,9 @@ var ImgCache = {
                     );
                 }
 
-                if (success_callback) { success_callback(); }
+                if (success_callback) {
+                  success_callback(entry.toURL());
+                }
             },
             function (error) {
                 if (error.source) { ImgCache.overridables.log('Download error source: ' + error.source, LOG_LEVEL_ERROR); }
@@ -694,6 +723,7 @@ var ImgCache = {
             return;
         }
 
+        var original_img_src = img_src;
         img_src = Helpers.sanitizeURI(img_src);
 
         var path = Private.getCachedFilePath(img_src);
@@ -706,11 +736,12 @@ var ImgCache = {
         }
 
         // try to get the file entry: if it fails, there's no such file in the cache
+        // if it fails, we send the original path, not the sanitized one.
         ImgCache.attributes.filesystem.root.getFile(
             path,
             { create: false },
             function (file_entry) { response_callback(img_src, file_entry); },
-            function () { response_callback(img_src, null); }
+            function () { response_callback(original_img_src, null); }
         );
     };
 
@@ -855,13 +886,16 @@ var ImgCache = {
             return;
         }
 
-        var _setBackgroundImagePath = function ($element, new_src, old_src) {
-            DomHelpers.setBackgroundImage($element, 'url("' + new_src + '")');
-            // store previous url in case we need to reload it
-            DomHelpers.setAttribute($element, OLD_BACKGROUND_ATTR, old_src);
-        };
+        Private.loadCachedFile($div, img_src, Private.setBackgroundImagePath, success_callback, error_callback);
+    };
 
-        Private.loadCachedFile($div, img_src, _setBackgroundImagePath, success_callback, error_callback);
+    ImgCache.useCachedBackgroundWithSource = function ($div, image_url, success_callback, error_callback) {
+
+        if (!Private.isImgCacheLoaded()) {
+            return;
+        }
+
+        Private.loadCachedFile($div, image_url, Private.setBackgroundImagePath, success_callback, error_callback);
     };
 
 

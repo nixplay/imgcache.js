@@ -16,6 +16,7 @@ This library works with Phonegap/Cordova (v >= 1.7), the supported platforms bei
 * Android
 * iOS
 * Windows Phone 8.1
+* Amazon Fire OS
 
 Most methods are **ASYNCHRONOUS** : use callbacks if required.
 
@@ -179,6 +180,7 @@ High level API
 * ImgCache.**isBackgroundCached**() *-- checks if a the given element background image exists in the cache - does not check if the latest version of that file is cached*
 * ImgCache.**cacheBackground**() *-- caches the background image of an element*
 * ImgCache.**useCachedBackground**() *-- replaces the background image source of the given element with the cached version*
+* ImgCache.**useCachedBackgroundWithSource**() *-- similar to useCachedBackground but with the image source url as extra parameter*
 * ImgCache.**useBackgroundOnlineFile**() *-- replaces back a background image with the original (online) version*
 * ImgCache.**removeFile**() *-- removes a given file from the cache*
 * ImgCache.**getCurrentSize**() *-- returns the current size of the ImgCache cache in bytes // synchronous method*
@@ -260,12 +262,16 @@ See also
 --------
 Wrappers for AngularJS:
 
-* [angular-imgcache.js](https://github.com/jBenes/angular-imgcache.js)
+* [angular-imgcache.js](https://github.com/maistho/angular-imgcache.js)
 * [ngImgCache](https://github.com/sunsus/ngImgCache/)
+
+Wrapper for Ionic Framework:
+
+* [ionic-img-cache](https://github.com/vitaliy-bobrov/ionic-img-cache)
 
 License
 -------
-Copyright 2012-2015 (c) Christophe BENOIT - [Wobis](http://www.wobis.fr)
+Copyright 2012-2017 (c) Christophe BENOIT
 
 Apache License - see LICENSE.md
 
